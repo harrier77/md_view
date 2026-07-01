@@ -1,25 +1,25 @@
-# md_view — Visualizzatore Markdown con GTK4 e WebKitGTK
+# md_view — Markdown Viewer with GTK4 and WebKitGTK
 
-Legge file Markdown (`.md`) e li mostra in una finestra GTK4 usando
-WebKitGTK per il rendering, con conversione markdown→HTML tramite
+Reads Markdown (`.md`) files and displays them in a GTK4 window using
+WebKitGTK for rendering, with markdown→HTML conversion via
 `libcmark` (CommonMark).
 
-## Dipendenze
+## Dependencies
 
 - `libgtk-4-dev` ≥ 4.6
 - `libwebkitgtk-6.0-dev` ≥ 2.40
 - `libcmark-dev` ≥ 0.30
 - `meson` ≥ 0.60, `ninja`
 
-### Installazione su Ubuntu 22.04
+### Installation on Ubuntu 22.04
 
 ```bash
 sudo apt install libgtk-4-dev libwebkitgtk-6.0-dev libcmark-dev meson ninja-build
 ```
 
-> **Nota**: `libwebkitgtk-6.0-dev` è disponibile solo da
-> `jammy-updates`/`jammy-security`. Se non lo trovi,
-> aggiorna la lista pacchetti con `sudo apt update`.
+> **Note**: `libwebkitgtk-6.0-dev` is only available from
+> `jammy-updates`/`jammy-security`. If you can't find it,
+> update the package list with `sudo apt update`.
 
 ## Build
 
@@ -30,120 +30,119 @@ ninja -C builddir
 
 ## Install
 
-Installa in `/opt/md_view` (default) e crea il symlink
+Installs to `/opt/md_view` (default) and creates a symlink at
 `/usr/local/bin/md_view`:
 
 ```bash
 sudo ./install.sh
 ```
 
-Per installare in un percorso diverso:
+To install to a different path:
 
 ```bash
 sudo ./install.sh /usr/local
 ```
 
-Disinstallazione:
+Uninstall:
 
 ```bash
 sudo ./uninstall.sh
 ```
 
-## Esecuzione
+## Usage
 
 ```bash
-# Con file passato come argomento
+# With a file passed as argument
 ./builddir/md_view helloworld.md
 
-# Senza argomenti — finestra vuota, apri file con Ctrl+O
+# Without arguments — empty window, open file with Ctrl+O
 ./builddir/md_view
 ```
 
-## Architettura
+## Architecture
 
 ```
 src/
-├── main.c          # Entry point, crea GtkApplication
-├── app.h / app.c   # GtkApplication, azioni Open/Quit, barra menu
-├── viewer.h/c      # WebKitWebView incapsulato in GtkScrolledWindow
+├── main.c          # Entry point, creates GtkApplication
+├── app.h / app.c   # GtkApplication, Open/Quit actions, menu bar
+├── viewer.h/c      # WebKitWebView wrapped in GtkScrolledWindow
 ├── md_render.h/c   # cmark → HTML + CSS embedded via GResource
 └── resources/
-    ├── style.css   # Tema chiaro/scuro automatico (prefers-color-scheme)
+    ├── style.css   # Light/dark auto theme (prefers-color-scheme)
     └── gresource.xml
 ```
 
-### Flusso
+### Flow
 
-1. **`main.c`** avvia `GtkApplication` con flag `G_APPLICATION_HANDLES_OPEN`
-2. Se passato via CLI, GApplication emette `::open` → `on_open_files()`
-3. **`md_render.c`** legge il file, lo passa a `cmark_markdown_to_html()`,
-   avvolge il risultato in un HTML completo con `<style>` dal CSS embedded
-4. **`viewer.c`** carica l'HTML con `webkit_web_view_load_html()`
-5. La finestra contiene una `GtkPopoverMenuBar` in alto con **File > Open**
-   (Ctrl+O) e **File > Quit** (Ctrl+Q) sopra il viewer
-6. In assenza di argomenti, `Ctrl+O` o menu → `GtkFileChooserNative` filtrato
-   per `*.md`
+1. **`main.c`** starts `GtkApplication` with flag `G_APPLICATION_HANDLES_OPEN`
+2. If passed via CLI, GApplication emits `::open` → `on_open_files()`
+3. **`md_render.c`** reads the file, passes it to `cmark_markdown_to_html()`,
+   wraps the result in a full HTML document with `<style>` from the embedded CSS
+4. **`viewer.c`** loads the HTML with `webkit_web_view_load_html()`
+5. The window has a `GtkPopoverMenuBar` at the top with **File > Open**
+   (Ctrl+O) and **File > Quit** (Ctrl+Q) above the viewer
+6. Without arguments, `Ctrl+O` or menu → `GtkFileChooserNative` filtered
+   for `*.md`
 
-## Bugfix applicati
+## Bug fixes
 
-### Layout verticale con menu visibile
+### Vertical layout with always-visible menu bar
 
-**Problema**: Il menu impostato con `gtk_application_set_menubar()` viene
-mostrato solo nel titlebar delle finestre con CSD. Su sistemi senza CSD o con
-gestori di finestre che non lo supportano, la barra menu è invisibile e il
-widget WebKit occupa l'intera finestra.
+**Problem**: The menu set with `gtk_application_set_menubar()` is only
+shown in the titlebar of CSD windows. On systems without CSD or with
+window managers that don't support it, the menu bar is invisible and the
+WebKit widget fills the entire window.
 
-**Fix**: Layout verticale in `activate()` (`app.c`): la finestra contiene un
-`GtkBox` con una `GtkPopoverMenuBar` (creata da `GMenuModel`) in alto e il
-viewer sotto con `vexpand: TRUE`. Funziona sempre, indipendentemente dal
-supporto CSD.
+**Fix**: Vertical layout in `activate()` (`app.c`): the window contains a
+`GtkBox` with a `GtkPopoverMenuBar` (created from `GMenuModel`) at the top
+and the viewer below with `vexpand: TRUE`. Works regardless of CSD support.
 
-### Azione `quit` mancante
+### Missing `quit` action
 
-**Problema**: `app.quit` era registrato come acceleratore (`<Ctrl>Q`) ma
-non esisteva nelle `GActionEntry` — la scorciatoia non faceva nulla.
+**Problem**: `app.quit` was registered as an accelerator (`<Ctrl>Q`) but
+did not exist in `GActionEntry` — the shortcut did nothing.
 
-**Fix**: Aggiunta azione `quit` con callback `on_quit_action()` che chiama
+**Fix**: Added `quit` action with callback `on_quit_action()` that calls
 `gtk_window_destroy()`.
 
-### Cast errato `GtkViewport → WebKitWebView`
+### Invalid cast `GtkViewport → WebKitWebView`
 
-**Problema**: `gtk_scrolled_window_get_child()` in GTK4 non restituisce
-sempre il widget che hai passato a `set_child()`. Se il child non implementa
-`GtkScrollable` (come `WebKitWebView`), GTK4 inserisce automaticamente un
-`GtkViewport` intermedio. `get_child()` restituisce il viewport, non il
-webview, causando:
+**Problem**: `gtk_scrolled_window_get_child()` in GTK4 does not always
+return the widget you passed to `set_child()`. If the child does not
+implement `GtkScrollable` (like `WebKitWebView`), GTK4 automatically
+inserts an intermediate `GtkViewport`. `get_child()` returns the viewport,
+not the webview, causing:
 
 ```
 invalid cast from 'GtkViewport' to 'WebKitWebView'
 ```
 
-**Fix**: Funzione `get_webview()` in `viewer.c` che tenta in ordine:
-1. Cast diretto del risultato di `get_child()`
-2. `gtk_widget_get_first_child()` sul viewport
-3. Fallback a `g_object_set_data()` salvato in fase di creazione
+**Fix**: `get_webview()` function in `viewer.c` that tries in order:
+1. Direct cast of `get_child()` result
+2. `gtk_widget_get_first_child()` on the viewport
+3. Fallback to `g_object_set_data()` saved at creation time
 
-Serve a gestire sia il caso con viewport automatico, sia versioni future
-in cui WebKitWebView potrebbe diventare scrollable.
+Handles both the automatic viewport case and future versions where
+WebKitWebView might become scrollable.
 
-### `base_uri` non impostato
+### Missing `base_uri`
 
-**Problema**: `webkit_web_view_load_html()` chiamato con `base_uri = NULL`.
-Alcune versioni di WebKitGTK possono rifiutare il caricamento o avere
-problemi con risorse relative.
+**Problem**: `webkit_web_view_load_html()` called with `base_uri = NULL`.
+Some WebKitGTK versions may refuse to load or have issues with relative
+resources.
 
-**Fix**: Calcolo del `base_uri` come `file:///directory/del/file/` in
-`app_open_file()` e passaggio a `viewer_load_markdown()`.
+**Fix**: Compute `base_uri` as `file:///directory/of/file/` in
+`app_open_file()` and pass it to `viewer_load_markdown()`.
 
 ### CSS embedded via GResource
 
-Il foglio di stile `style.css` viene compilato nel binario con
-`gnome.compile_resources()` (meson). Temi chiaro/scuro automatici
-tramite `@media (prefers-color-scheme: dark)`.
+The `style.css` stylesheet is compiled into the binary with
+`gnome.compile_resources()` (meson). Automatic light/dark themes
+via `@media (prefers-color-scheme: dark)`.
 
-## Dipendenze tecniche risolte
+## Technical dependencies resolved
 
-Su Ubuntu 22.04, `libwebkit2gtk-4.1-dev` è bloccato alla versione 2.36.0
-(mentre la libreria runtime è 2.50.4), causando conflitti `apt`.
-Soluzione: usare `libwebkitgtk-6.0-dev` (API 6.0 basata su GTK4), disponibile
-in versione aggiornata dai repos `jammy-updates`/`jammy-security`.
+On Ubuntu 22.04, `libwebkit2gtk-4.1-dev` is pinned to version 2.36.0
+(while the runtime library is 2.50.4), causing `apt` conflicts.
+Solution: use `libwebkitgtk-6.0-dev` (API 6.0 based on GTK4), available
+in an updated version from `jammy-updates`/`jammy-security`.
