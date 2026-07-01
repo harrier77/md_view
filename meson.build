@@ -17,3 +17,9 @@ executable('md_view',
   resources,
   dependencies: [gtk4, webkit, cmark],
   install: true)
+
+install_data('com.mdview.app.desktop',
+  install_dir: get_option('datadir') / 'applications')
+
+install_data('src/resources/com.mdview.app.svg',
+  install_dir: get_option('datadir') / 'icons/hicolor/scalable/apps')

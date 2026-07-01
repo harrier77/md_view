@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=md_view
+Name[it]=md_view
+Comment=Markdown viewer using GTK4 and WebKitGTK
+Comment[it]=Visualizzatore Markdown con GTK4 e WebKitGTK
+Exec=md_view %F
+Icon=com.mdview.app
+Terminal=false
+Categories=Office;Viewer;TextTools;
+MimeType=text/markdown;
+StartupNotify=true
